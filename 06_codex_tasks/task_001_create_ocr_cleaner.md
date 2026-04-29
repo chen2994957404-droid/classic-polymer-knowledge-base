@@ -10,7 +10,7 @@ The script must not rewrite academic content, summarize chapters, correct formul
 
 - The input is a UTF-8 encoded `.md` or `.txt` file.
 - The input may contain OCR artifacts, Markdown headings, plain paragraphs, tables, figure captions, and LaTeX-style formulas.
-- Formula blocks may appear as `$$ ... $$`, `\[ ... \]`, or fenced code blocks.
+- Formula blocks may appear as single-line display formulas (`$$ ... $$`), multi-line display formulas (`$$` ... `$$`), bracket display formulas (`\[` ... `\]`), or fenced code blocks.
 - The input may contain excessive blank lines and trailing spaces.
 - The input may contain uncertain OCR characters or suspicious tokens.
 
@@ -21,7 +21,7 @@ The script should write a UTF-8 Markdown file that:
 1. Strips trailing spaces from each line.
 2. Normalizes excessive blank lines to at most two consecutive blank lines.
 3. Preserves Markdown headings and the original line order.
-4. Preserves LaTeX-style formula blocks without changing their contents except trailing-space cleanup.
+4. Preserves single-line and multi-line LaTeX-style formula blocks without changing their contents except trailing-space cleanup.
 5. Marks suspicious OCR lines with a visible `<!-- OCR-UNCERTAIN: ... -->` comment immediately before the original line.
 6. Never deletes uncertain lines.
 7. Appends a short cleaning report at the end of the output file.

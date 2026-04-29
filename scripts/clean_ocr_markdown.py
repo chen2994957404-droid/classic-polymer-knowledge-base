@@ -48,9 +48,19 @@ def is_fence_toggle(line: str) -> bool:
     return stripped.startswith("```") or stripped.startswith("~~~")
 
 
+def is_single_line_dollar_formula(line: str) -> bool:
+    stripped = line.strip()
+    return (
+        stripped.startswith("$$")
+        and stripped.endswith("$$")
+        and stripped != "$$"
+        and stripped.count("$$") >= 2
+    )
+
+
 def is_dollar_formula_toggle(line: str) -> bool:
-    # Treat a line with an odd number of $$ markers as a block boundary.
-    return line.count("$$") % 2 == 1
+    # Treat a line with an unpaired $$ marker as a block boundary.
+    return not is_single_line_dollar_formula(line) and line.count("$$") % 2 == 1
 
 
 def is_bracket_formula_start(line: str) -> bool:
@@ -59,6 +69,58 @@ def is_bracket_formula_start(line: str) -> bool:
 
 def is_bracket_formula_end(line: str) -> bool:
     return line.strip() == r"\]"
+
+
+def is_protected_line(
+    line: str,
+    in_fenced_block: bool,
+    in_dollar_formula: bool,
+    in_bracket_formula: bool,
+) -> bool:
+    return (
+        in_fenced_block
+        or in_dollar_formula
+        or in_bracket_formula
+        or is_fence_toggle(line)
+        or is_single_line_dollar_formula(line)
+        or is_dollar_formula_toggle(line)
+        or is_bracket_formula_start(line)
+        or is_bracket_formula_end(line)
+    )
+
+
+def update_protected_state(
+    line: str,
+    in_fenced_block: bool,
+    in_dollar_formula: bool,
+    in_bracket_formula: bool,
+) -> tuple[bool, bool, bool]:
+    if is_fence_toggle(line):
+        return not in_fenced_block, in_dollar_formula, in_bracket_formula
+
+    if in_fenced_block:
+        return in_fenced_block, in_dollar_formula, in_bracket_formula
+
+    if in_dollar_formula:
+        if is_dollar_formula_toggle(line):
+            in_dollar_formula = False
+        return in_fenced_block, in_dollar_formula, in_bracket_formula
+
+    if is_single_line_dollar_formula(line):
+        return in_fenced_block, in_dollar_formula, in_bracket_formula
+
+    if is_dollar_formula_toggle(line):
+        return in_fenced_block, True, in_bracket_formula
+
+    if in_bracket_formula:
+        if is_bracket_formula_end(line):
+            in_bracket_formula = False
+        return in_fenced_block, in_dollar_formula, in_bracket_formula
+
+    if is_bracket_formula_start(line):
+        in_bracket_formula = True
+
+    return in_fenced_block, in_dollar_formula, in_bracket_formula
 
 
 def uncertainty_reason(line: str) -> str | None:
@@ -98,6 +160,25 @@ def clean_lines(lines: list[str]) -> tuple[list[str], CleaningStats]:
             stats.trailing_space_lines += 1
         line = stripped_trailing
 
+        in_protected_block = is_protected_line(
+            line,
+            in_fenced_block,
+            in_dollar_formula,
+            in_bracket_formula,
+        )
+
+        if in_protected_block:
+            blank_run = 0
+            stats.formula_or_code_block_lines += 1
+            output.append(line)
+            in_fenced_block, in_dollar_formula, in_bracket_formula = update_protected_state(
+                line,
+                in_fenced_block,
+                in_dollar_formula,
+                in_bracket_formula,
+            )
+            continue
+
         if line.strip() == "":
             blank_run += 1
             if blank_run <= 2:
@@ -108,27 +189,11 @@ def clean_lines(lines: list[str]) -> tuple[list[str], CleaningStats]:
 
         blank_run = 0
 
-        in_protected_block = in_fenced_block or in_dollar_formula or in_bracket_formula
-        if in_protected_block:
-            stats.formula_or_code_block_lines += 1
-            output.append(line)
-        else:
-            reason = uncertainty_reason(line)
-            if reason:
-                output.append(f"<!-- OCR-UNCERTAIN: {reason} -->")
-                stats.uncertain_lines += 1
-            output.append(line)
-
-        # Toggle protected regions after output so boundary lines are preserved.
-        if is_fence_toggle(line):
-            in_fenced_block = not in_fenced_block
-        elif not in_fenced_block:
-            if is_dollar_formula_toggle(line):
-                in_dollar_formula = not in_dollar_formula
-            elif is_bracket_formula_start(line):
-                in_bracket_formula = True
-            elif is_bracket_formula_end(line):
-                in_bracket_formula = False
+        reason = uncertainty_reason(line)
+        if reason:
+            output.append(f"<!-- OCR-UNCERTAIN: {reason} -->")
+            stats.uncertain_lines += 1
+        output.append(line)
 
     stats.output_lines_before_report = len(output)
     return output, stats
