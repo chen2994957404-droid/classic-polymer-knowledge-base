@@ -179,3 +179,32 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Raw copyrighted textbook files - keep local only
+01_raw_local/
+*.pdf
+*.djvu
+*.epub
+
+# Large page images generated from scanned PDFs
+*.tif
+*.tiff
+*.bmp
+*_page_images/
+page_images/
+
+# Temporary OCR/cache files
+.cache/
+temp/
+tmp/
+__pycache__/
+*.log
+
+# Local environment files
+.env
+.venv/
+venv/
+
+# Notion/API secrets
+notion_token.txt
+openai_api_key.txt
